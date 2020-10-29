@@ -17,10 +17,92 @@ freely, subject to the following restrictions:
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
 */
+#include <cstdio> // printf()
 #include "flecs.h"
+
+// components
+struct Position
+{
+   int x;
+   int y;
+};
+
+// tags ("empty" components)
+struct Asteroid
+{
+};
+
+struct Rocket
+{
+};
 
 int main()
 {
-    flecs::world ecs;
-    return 0;
+   flecs::world ecs;
+
+   // register components (and tags)
+   ecs.component<Position>();
+   ecs.component<Asteroid>();
+   ecs.component<Rocket>();
+
+   // query for Asteroids is evaluated in a system below
+   auto qryAsteroid = ecs.query<Position, Asteroid>();
+
+   // system: print Asteroids
+   ecs.system<>(nullptr, "Position,Asteroid").iter([](flecs::iter &it) {
+      flecs::column<Position> colPos(it, 1);
+      for (auto row : it)
+      {
+         printf("Asteroid here: (%i,%i)\n", colPos[row].x, colPos[row].y);
+      }
+   });
+
+   // system: move, print Rockets
+   ecs.system<>(nullptr, "Position,Rocket").iter([](flecs::iter &it) {
+      flecs::column<Position> colPos(it, 1);
+      for (auto row : it)
+      {
+         colPos[row].y++;
+         printf("Rocket moved: (%i,%i)\n", colPos[row].x, colPos[row].y);
+      }
+   });
+
+   // system: collide Rockets with Asteroids
+   // todo: is it safe to capture variables here? qryAsteroid is captured
+   // todo: how to get qryAsteroid out of the world, via it.world()?
+   ecs.system<>(nullptr, "Position,Rocket").iter([&](flecs::iter &it) {
+      flecs::column<Position> colPos(it, 1);
+      for (auto row : it)
+      {
+         // todo: is it safe to capture colPos, row, it here?
+         qryAsteroid.each([&](flecs::entity e, Position &p, Asteroid &a) {
+            if (colPos[row].x == p.x && colPos[row].y == p.y)
+            {
+               printf("BOOM: (%i,%i)\n", p.x, p.y);
+               // todo: is it appropriate to destruct entities here, this way?
+               e.destruct();              // kill Asteroid
+               it.entity(row).destruct(); // kill Rocket
+            }
+         });
+      }
+   });
+
+   // add entities, Rockets will move up until collision
+   //       A
+   //    A
+   // A
+   // R  R  R
+   for (int i = 0; i < 3; i++)
+   {
+      ecs.entity().set<Position>({i, i + 1}).add<Asteroid>();
+      ecs.entity().set<Position>({i, 0}).add<Rocket>();
+   }
+
+   for (int i = 0; i < 4; i++)
+   {
+      ecs.progress();
+      printf("------- end of frame -------\n");
+   }
+
+   return 0;
 }
