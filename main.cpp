@@ -23,8 +23,8 @@ freely, subject to the following restrictions:
 // components
 struct Position
 {
-   int x;
-   int y;
+    int x;
+    int y;
 };
 
 // tags ("empty" components)
@@ -38,71 +38,81 @@ struct Rocket
 
 int main()
 {
-   flecs::world ecs;
+    flecs::world ecs;
 
-   // register components (and tags)
-   ecs.component<Position>();
-   ecs.component<Asteroid>();
-   ecs.component<Rocket>();
+    // register components (and tags)
+    ecs.component<Position>();
+    ecs.component<Asteroid>();
+    ecs.component<Rocket>();
 
-   // query for Asteroids is evaluated in a system below
-   auto qryAsteroid = ecs.query<Position, Asteroid>();
+    // query for Asteroids is evaluated in a system below
+    auto qryAsteroid = ecs.query<Position, Asteroid>();
 
-   // system: print Asteroids
-   ecs.system<>(nullptr, "Position,Asteroid").iter([](flecs::iter &it) {
-      flecs::column<Position> colPos(it, 1);
-      for (auto row : it)
-      {
-         printf("Asteroid here: (%i,%i)\n", colPos[row].x, colPos[row].y);
-      }
-   });
+    // system: print Asteroids
+    // this system is expressed with a signature string (components)
+    // the columns (Position) are retrieved from the iterator manually
+    ecs.system<>(nullptr, "[out] Position, Asteroid").iter([](flecs::iter &it) {
+        flecs::column<Position> colPos(it, 1);
+        for (auto row : it)
+            printf("Asteroid here: (%i,%i)\n", colPos[row].x, colPos[row].y);
+    });
 
-   // system: move, print Rockets
-   ecs.system<>(nullptr, "Position,Rocket").iter([](flecs::iter &it) {
-      flecs::column<Position> colPos(it, 1);
-      for (auto row : it)
-      {
-         colPos[row].y++;
-         printf("Rocket moved: (%i,%i)\n", colPos[row].x, colPos[row].y);
-      }
-   });
+    // system: move, print Rockets
+    // this system is expressed with components as template parameters
+    ecs.system<Position, Rocket>().iter([](flecs::iter &it, Position *p, Rocket *r) {
+        for (auto row : it)
+        {
+            p[row].y++;
+            printf("Rocket moved: (%i,%i)\n", p[row].x, p[row].y);
+        }
+    });
 
-   // system: collide Rockets with Asteroids
-   // todo: is it safe to capture variables here? qryAsteroid is captured
-   // todo: how to get qryAsteroid out of the world, via it.world()?
-   ecs.system<>(nullptr, "Position,Rocket").iter([&](flecs::iter &it) {
-      flecs::column<Position> colPos(it, 1);
-      for (auto row : it)
-      {
-         // todo: is it safe to capture colPos, row, it here?
-         qryAsteroid.each([&](flecs::entity e, Position &p, Asteroid &a) {
-            if (colPos[row].x == p.x && colPos[row].y == p.y)
-            {
-               printf("BOOM: (%i,%i)\n", p.x, p.y);
-               // todo: is it appropriate to destruct entities here, this way?
-               e.destruct();              // kill Asteroid
-               it.entity(row).destruct(); // kill Rocket
-            }
-         });
-      }
-   });
+    // system: match everything that has a Position
+    // not really useful, just for demonstrating iter()
+    // todo: is it safe to access p this way?
+    // todo: do something with the system handle sysPosition
+    auto sysPosition = ecs.system<Position>().iter([](flecs::iter &it, Position *p) {
+        for (auto row : it)
+            printf("something with a Position: (%i,%i)\n", p[row].x, p[row].y);
+    });
 
-   // add entities, Rockets will move up until collision
-   //       A
-   //    A
-   // A
-   // R  R  R
-   for (int i = 0; i < 3; i++)
-   {
-      ecs.entity().set<Position>({i, i + 1}).add<Asteroid>();
-      ecs.entity().set<Position>({i, 0}).add<Rocket>();
-   }
+    // system: collide Rockets with Asteroids
+    // todo: is it safe to capture variables here? qryAsteroid is captured
+    // todo: how to get qryAsteroid out of the world, via it.world()?
+    ecs.system<>(nullptr, "Position,Rocket").iter([&](flecs::iter &it) {
+        flecs::column<Position> colPos(it, 1);
+        for (auto row : it)
+        {
+            // todo: is it safe to capture colPos, row, it here?
+            qryAsteroid.each([&](flecs::entity e, Position &p, Asteroid &a) {
+                if (colPos[row].x == p.x && colPos[row].y == p.y)
+                {
+                    printf("BOOM: (%i,%i)\n", p.x, p.y);
+                    // todo: is it appropriate to destruct entities here, this way?
+                    e.destruct();              // kill Asteroid
+                    it.entity(row).destruct(); // kill Rocket
+                }
+            });
+        }
+    });
 
-   for (int i = 0; i < 4; i++)
-   {
-      ecs.progress();
-      printf("------- end of frame -------\n");
-   }
+    // add entities, Rockets will move up until collision
+    //       A
+    //    A
+    // A
+    // R  R  R
+    for (int i = 0; i < 3; i++)
+    {
+        ecs.entity().set<Position>({i, i + 1}).add<Asteroid>();
+        ecs.entity().set<Position>({i, 0}).add<Rocket>();
+    }
 
-   return 0;
+    // progress until no Rockets left
+    while (ecs.count<Rocket>() > 0)
+    {
+        ecs.progress();
+        printf("------- end of frame -------\n");
+    }
+
+    return 0;
 }
