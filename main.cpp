@@ -54,7 +54,9 @@ int main()
     ecs.system<>(nullptr, "[out] Position, Asteroid").iter([](flecs::iter &it) {
         flecs::column<Position> colPos(it, 1);
         for (auto row : it)
+        {
             printf("Asteroid here: (%i,%i)\n", colPos[row].x, colPos[row].y);
+        }
     });
 
     // system: move, print Rockets
@@ -68,12 +70,25 @@ int main()
     });
 
     // system: match everything that has a Position
-    // not really useful, just for demonstrating iter()
-    // todo: is it safe to access p this way?
-    // todo: do something with the system handle sysPosition
-    auto sysPosition = ecs.system<Position>().iter([](flecs::iter &it, Position *p) {
+    auto sysPositionIter = ecs.system<const Position>().iter([](flecs::iter &it, const Position *p) {
+        // iter()-systems are invoked multiple times, for all "types" (list of components) that appear.
+        // here: invoked for type (Position, Asteroid) and for type (Position, Rocket)
+        printf("iter() invoked for Position, %i entitie(s):\n", it.count());
         for (auto row : it)
-            printf("something with a Position: (%i,%i)\n", p[row].x, p[row].y);
+        {
+            flecs::type eT = it.entity(row).type();
+            // p can be accessed as a c-array. components for each type are algined continuously on memory.
+            printf("  %s here: (%i,%i) (matched via iter())\n", eT.str().c_str(), p[row].x, p[row].y);
+        }
+    });
+
+    // system: match everything that has a Position, via each()
+    auto sysPositionEach = ecs.system<const Position>().each([](flecs::entity e, const Position &p) {
+        flecs::type eT = e.type();
+        printf("%s here: (%i,%i) (matched via each())\n", eT.str().c_str(), p.x, p.y);
+        // todo: show what else can be done with an entity:
+        // entities can be asked if they have a component, like so:
+        //   if(e.has<Asteroid>()){...}
     });
 
     // system: collide Rockets with Asteroids
