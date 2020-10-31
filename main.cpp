@@ -45,9 +45,6 @@ int main()
     ecs.component<Asteroid>();
     ecs.component<Rocket>();
 
-    // query for Asteroids is evaluated in a system below
-    auto qryAsteroid = ecs.query<Position, Asteroid>();
-
     // system: print Asteroids
     // this system is expressed with a signature string (components)
     // the columns (Position) are retrieved from the iterator manually
@@ -100,24 +97,44 @@ int main()
             //   if(e.has<Asteroid>()){...}
         });
 
+    // query for Asteroids
+    auto qryAsteroid = ecs.query<Position, Asteroid>();
+
+    // filter for Asteroids
+    flecs::filter filtAsteroid =
+        flecs::filter(ecs)
+            .include<Position>()
+            .include<Asteroid>()
+            .include_kind(flecs::MatchAll);
+
     // system: collide Rockets with Asteroids
-    // todo: is it safe to capture variables here? qryAsteroid is captured
-    // todo: how to get qryAsteroid out of the world, via it.world()?
+    // todo: is it safe to capture variables here? qryAsteroid/filtAsteroid are captured
+    // todo: can we get qryAsteroid/filtAsteroid from it.world()?
     ecs.system<>(nullptr, "Position,Rocket")
         .iter([&](flecs::iter &it) {
-            flecs::column<Position> colPos(it, 1);
+            flecs::column<Position> p(it, 1);
+            // loop over all rows and get Position (of a Rocket) from column p.
+            // in a nested loop, use a query or a filter to compare Rocket
+            // Position to Position of all Asteroids in the world.
             for (auto row : it)
             {
-                // todo: is it safe to capture colPos, row, it here?
-                qryAsteroid.each([&](flecs::entity e, Position &p, Asteroid &a) {
-                    if (colPos[row].x == p.x && colPos[row].y == p.y)
+#if 1 // query/filter switch
+                for (auto it1 : qryAsteroid)
+#else
+                for (auto it1 : it.world().filter(filtAsteroid))
+#endif
+                {
+                    auto p1 = it1.table_column<Position>();
+                    for (auto row1 : it1)
                     {
-                        printf("BOOM: (%i,%i)\n", p.x, p.y);
-                        // todo: is it appropriate to destruct entities here, this way?
-                        e.destruct();              // kill Asteroid
-                        it.entity(row).destruct(); // kill Rocket
+                        if (p[row].x == p1[row1].x && p[row].y == p1[row1].y)
+                        {
+                            printf("BOOM: (%i,%i)\n", p1[row1].x, p1[row1].y);
+                            it1.entity(row1).destruct(); // kill Asteroid
+                            it.entity(row).destruct();   // kill Rocket
+                        }
                     }
-                });
+                }
             }
         });
 
@@ -130,6 +147,35 @@ int main()
     {
         ecs.entity().set<Position>({i, i + 1}).add<Asteroid>();
         ecs.entity().set<Position>({i, 0}).add<Rocket>();
+    }
+
+    // use a query or a filter to get all entities, that have a Position.
+    // this is essentially doing what a system does, without having a function
+    // or lambda to be called (each(), iter()), but rather iteration over tables
+    // and rows by oneself.
+    // this is used in the system "collide Rockets with Asteroids" above, to implement
+    // a nested search for Asteroids inside the system.
+    // queries are faster to iterate, but slower to construct, than filters.
+    // queries can also be used with each() and iter(), like systems.
+#if 1 // query/filter switch
+    printf("------- querying Position -------\n");
+    auto qryPosition = ecs.query<Position>();
+
+    for (auto it : qryPosition)
+#else
+    printf("------- filtering Position -------\n");
+    flecs::filter filtPosition = flecs::filter(ecs).include<Position>().include_kind(flecs::MatchAll);
+
+    for (auto it : ecs.filter(filtPosition))
+#endif
+    {
+        printf("query/filter for Position, iterating over %i rows:\n", it.count());
+        auto p = it.table_column<Position>();
+        for (auto row : it)
+        {
+            flecs::type eT = it.entity(row).type();
+            printf("  %s here: (%i,%i) (query/filter)\n", eT.str().c_str(), p[row].x, p[row].y);
+        }
     }
 
     // these systems have been declared with kind(0), which means they
