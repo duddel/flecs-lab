@@ -1,6 +1,6 @@
 # Flecs Lab
 
-In this experiment, we compile Flecs (v2.2.0) into an executable and play with the Flecs C++ API.
+In this experiment, we compile Flecs into an executable and play with the Flecs C++ API.
 
 The `Flecs` source code is not provided in this repository, but cloned during the build step. This is done by CMake with `ExternalProject`, see: [CMakeLists.txt](CMakeLists.txt).
 
@@ -14,7 +14,7 @@ cmake --build .
 ctest -V
 ```
 
-## Flecs (v2.2.0) License
+## Flecs License
 
 MIT License
 

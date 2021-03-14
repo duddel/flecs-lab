@@ -12,7 +12,7 @@ include(ExternalProject)
 
 ExternalProject_Add(flecs-clone
   GIT_REPOSITORY https://github.com/SanderMertens/flecs.git
-  GIT_TAG v2.2.0
+  GIT_TAG v2.3.2
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ""
   INSTALL_COMMAND ""
@@ -23,9 +23,11 @@ ExternalProject_Get_property(flecs-clone SOURCE_DIR)
 
 list(APPEND FLECS_SOURCES
   ${SOURCE_DIR}/src/api_support.c
+  ${SOURCE_DIR}/src/bitset.c
   ${SOURCE_DIR}/src/bootstrap.c
   ${SOURCE_DIR}/src/entity.c
   ${SOURCE_DIR}/src/filter.c
+  ${SOURCE_DIR}/src/hash.c
   ${SOURCE_DIR}/src/hierarchy.c
   ${SOURCE_DIR}/src/iter.c
   ${SOURCE_DIR}/src/log.c
@@ -43,7 +45,6 @@ list(APPEND FLECS_SOURCES
   ${SOURCE_DIR}/src/type.c
   ${SOURCE_DIR}/src/vector.c
   ${SOURCE_DIR}/src/world.c
-  ${SOURCE_DIR}/src/modules/stats.c
   ${SOURCE_DIR}/src/modules/timer.c
   ${SOURCE_DIR}/src/modules/pipeline/pipeline.c
   ${SOURCE_DIR}/src/modules/pipeline/worker.c
@@ -51,10 +52,12 @@ list(APPEND FLECS_SOURCES
   ${SOURCE_DIR}/src/modules/system/system_dbg.c
   ${SOURCE_DIR}/src/addons/bulk.c
   ${SOURCE_DIR}/src/addons/dbg.c
+  ${SOURCE_DIR}/src/addons/direct_access.c
   ${SOURCE_DIR}/src/addons/module.c
   ${SOURCE_DIR}/src/addons/queue.c
   ${SOURCE_DIR}/src/addons/reader.c
   ${SOURCE_DIR}/src/addons/snapshot.c
+  ${SOURCE_DIR}/src/addons/stats.c
   ${SOURCE_DIR}/src/addons/writer.c
 )
 
